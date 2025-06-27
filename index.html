@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed Computing Network - Device Status</title>
+    <meta name="description" content="Real-time status of distributed computing network nodes and devices">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f8fafc;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .header {
+            margin-bottom: 40px;
+        }
+        
+        .title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            color: #94a3b8;
+            margin-bottom: 30px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 30px 20px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(59, 130, 246, 0.15);
+        }
+        
+        .stat-number {
+            font-size: 3rem;
+            font-weight: 800;
+            color: #3b82f6;
+            margin-bottom: 10px;
+            display: block;
+        }
+        
+        .stat-label {
+            font-size: 1rem;
+            color: #cbd5e1;
+            font-weight: 500;
+        }
+        
+        .loading {
+            opacity: 0.6;
+        }
+        
+        .loading .stat-number {
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6, #3b82f6);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        
+        .device-list {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 30px;
+            text-align: left;
+        }
+        
+        .device-list h3 {
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            color: #f1f5f9;
+            text-align: center;
+        }
+        
+        .device-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .device-item:last-child {
+            border-bottom: none;
+        }
+        
+        .device-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .device-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+            box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+        }
+        
+        .device-name {
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+        
+        .device-specs {
+            font-size: 0.875rem;
+            color: #94a3b8;
+        }
+        
+        .refresh-btn {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            margin-top: 30px;
+        }
+        
+        .refresh-btn:hover {
+            transform: scale(1.05);
+        }
+        
+        .refresh-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .last-updated {
+            margin-top: 20px;
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+        
+        @media (max-width: 768px) {
+            .title {
+                font-size: 2rem;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stat-number {
+                font-size: 2.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">Distributed Computing Network</h1>
+            <p class="subtitle">Real-time monitoring of worker nodes and computational resources</p>
+        </div>
+        
+        <div class="stats-grid loading" id="statsGrid">
+            <div class="stat-card">
+                <span class="stat-number" id="totalDevices">--</span>
+                <span class="stat-label">Total Devices</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number" id="onlineDevices">--</span>
+                <span class="stat-label">Online Nodes</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number" id="totalCores">--</span>
+                <span class="stat-label">CPU Cores</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number" id="totalMemory">--</span>
+                <span class="stat-label">Total Memory (GB)</span>
+            </div>
+        </div>
+        
+        <div class="device-list">
+            <h3>Worker Nodes</h3>
+            <div id="devicesList">
+                <div class="device-item">
+                    <div class="device-info">
+                        <div class="device-status"></div>
+                        <div>
+                            <div class="device-name">Loading...</div>
+                            <div class="device-specs">Fetching device information...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="refresh-btn" onclick="loadDeviceData()">Refresh Data</button>
+            <div class="last-updated" id="lastUpdated">Last updated: Loading...</div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        
+        async function loadDeviceData() {
+            try {
+                const response = await fetch(`${API_BASE}/nodes`);
+                const nodes = await response.json();
+                
+                // Update statistics
+                const totalDevices = nodes.length;
+                const onlineDevices = nodes.filter(node => node.status === 'online').length;
+                const totalCores = nodes.reduce((sum, node) => sum + (node.cpu_cores || 0), 0);
+                const totalMemory = nodes.reduce((sum, node) => sum + (node.memory_gb || 0), 0);
+                
+                document.getElementById('totalDevices').textContent = totalDevices;
+                document.getElementById('onlineDevices').textContent = onlineDevices;
+                document.getElementById('totalCores').textContent = totalCores;
+                document.getElementById('totalMemory').textContent = totalMemory;
+                
+                // Update device list
+                const devicesList = document.getElementById('devicesList');
+                devicesList.innerHTML = '';
+                
+                if (nodes.length === 0) {
+                    devicesList.innerHTML = `
+                        <div class="device-item">
+                            <div class="device-info">
+                                <div class="device-name">No devices found</div>
+                                <div class="device-specs">No worker nodes are currently registered</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    nodes.forEach(node => {
+                        const deviceItem = document.createElement('div');
+                        deviceItem.className = 'device-item';
+                        deviceItem.innerHTML = `
+                            <div class="device-info">
+                                <div class="device-status" style="background: ${node.status === 'online' ? '#22c55e' : '#ef4444'}; box-shadow: 0 0 10px ${node.status === 'online' ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)'}"></div>
+                                <div>
+                                    <div class="device-name">${node.name || node.id}</div>
+                                    <div class="device-specs">${node.cpu_cores || 0} cores • ${node.memory_gb || 0}GB RAM • ${node.host || 'Unknown host'}</div>
+                                </div>
+                            </div>
+                            <div class="device-specs">${node.status || 'unknown'}</div>
+                        `;
+                        devicesList.appendChild(deviceItem);
+                    });
+                }
+                
+                // Remove loading state
+                document.getElementById('statsGrid').classList.remove('loading');
+                
+                // Update timestamp
+                document.getElementById('lastUpdated').textContent = `Last updated: ${new Date().toLocaleString()}`;
+                
+            } catch (error) {
+                console.error('Error loading device data:', error);
+                
+                // Show error state
+                document.getElementById('totalDevices').textContent = 'Error';
+                document.getElementById('onlineDevices').textContent = 'Error';
+                document.getElementById('totalCores').textContent = 'Error';
+                document.getElementById('totalMemory').textContent = 'Error';
+                
+                const devicesList = document.getElementById('devicesList');
+                devicesList.innerHTML = `
+                    <div class="device-item">
+                        <div class="device-info">
+                            <div class="device-name">Connection Error</div>
+                            <div class="device-specs">Unable to fetch device information. Please check your connection.</div>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('lastUpdated').textContent = `Error: ${new Date().toLocaleString()}`;
+            }
+        }
+        
+        // Load initial data
+        loadDeviceData();
+        
+        // Auto-refresh every 30 seconds
+        setInterval(loadDeviceData, 30000);
+    </script>
+</body>
+</html>
