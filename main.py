@@ -1,59 +1,29 @@
 # main.py
 
+from flask import Flask, send_from_directory
+import threading
 import time
 import json
-from distributed_executor import DistributedExecutor
-from your_tasks import *
-# main.py
-from distributed_executor import DistributedExecutor
 import logging
-
-from flask import Flask
 from distributed_executor import DistributedExecutor
+from your_tasks import *  # تأكد أن المهام معرفة هنا
 
+# إعداد Flask
 app = Flask(__name__)
-executor = DistributedExecutor("my_shared_secret_123")
 
 @app.route("/")
-def index():
-    return "نظام توزيع المهام جاهز للعمل!"
+def serve_index():
+    return send_from_directory('.', 'index.html')
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+def run_flask():
+    app.run(host='0.0.0.0', port=8000)
 
-def main():
+# منطق التوزيع
+def distributed_logic():
     logging.basicConfig(level=logging.INFO)
-    
-    try:
-        # تهيئة النظام
-        executor = DistributedExecutor("my_shared_secret_123")
-        executor.peer_registry.register_service("main_node", 7520)
-        
-        logging.info("نظام توزيع المهام يعمل...")
-        
-        # يمكنك هنا إضافة مهام للتنفيذ
-        while True:
-            time.sleep(1)
-            
-    except Exception as e:
-        logging.error(f"خطأ رئيسي: {str(e)}")
-
-if __name__ == "__main__":
-    main()
-def example_task(x):
-    # مهمة معقدة قابلة للتوزيع
-    return x * x + complex_operation(x)
-
-def benchmark(task_func, *args):
-    """قياس أداء المهمة"""
-    start = time.time()
-    result = task_func(*args)
-    duration = time.time() - start
-    return duration, result
-
-def main():
     executor = DistributedExecutor("my_shared_secret_123")
     executor.peer_registry.register_service("node1", 7520, load=0.2)
+    logging.info("🚀 نظام توزيع المهام يعمل...")
 
     tasks = {
         "1": ("ضرب المصفوفات", matrix_multiply, 500),
@@ -64,7 +34,7 @@ def main():
     }
 
     while True:
-        print("\nنظام توزيع المهام الذكي")
+        print("\n🚦 نظام توزيع المهام الذكي")
         print("اختر مهمة لتشغيلها:")
         for k, v in tasks.items():
             print(f"{k}: {v[0]}")
@@ -81,14 +51,28 @@ def main():
                 print("تم إرسال المهمة إلى العقدة الموزعة...")
                 future = executor.submit(func, arg)
                 result = future.result()
-                print(f"النتيجة (موزعة): {result}")
+                print(f"💡 النتيجة (موزعة): {result}")
             else:
                 duration, result = benchmark(func, arg)
-                print(f"النتيجة: {json.dumps(result, indent=2)[:200]}...")
-                print(f"الوقت المستغرق: {duration:.2f} ثانية")
+                print(f"💡 النتيجة: {json.dumps(result, indent=2)[:200]}...")
+                print(f"⏱️ الوقت المستغرق: {duration:.2f} ثانية")
         else:
-            print("اختيار غير صحيح!")
+            print("🚫 اختيار غير صحيح!")
 
+# دالة قياس الأداء
+def benchmark(task_func, *args):
+    start = time.time()
+    result = task_func(*args)
+    duration = time.time() - start
+    return duration, result
+
+# دالة مهمة معقدة
+def example_task(x):
+    return x * x + complex_operation(x)
+
+# تشغيل الكل
 if __name__ == "__main__":
-    main()
+    flask_thread = threading.Thread(target=run_flask)
+    flask_thread.start()
 
+    distributed_logic()
