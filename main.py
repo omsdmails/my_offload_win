@@ -1,4 +1,5 @@
 # main.py
+
 import time
 import json
 from distributed_executor import DistributedExecutor
@@ -6,6 +7,19 @@ from your_tasks import *
 # main.py
 from distributed_executor import DistributedExecutor
 import logging
+
+from flask import Flask
+from distributed_executor import DistributedExecutor
+
+app = Flask(__name__)
+executor = DistributedExecutor("my_shared_secret_123")
+
+@app.route("/")
+def index():
+    return "نظام توزيع المهام جاهز للعمل!"
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)
 
 def main():
     logging.basicConfig(level=logging.INFO)
