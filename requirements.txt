@@ -4,3 +4,5 @@ psutil
 zeroconf
 flask_cors
 numpy
+flask
+gunicorn
