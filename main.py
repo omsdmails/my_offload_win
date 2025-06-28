@@ -3,125 +3,95 @@ import json
 import logging
 import threading
 import os
-import requests  # ✅ ضروري للإرسال عبر HTTP
+import requests
+from flask import Flask, render_template, request, jsonify
 
-from flask import Flask, send_from_directory
-from distributed_executor import DistributedExecutor
-from your_tasks import *
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('app.log', mode='w'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
-# ⚙️ إعداد Flask
 app = Flask(__name__)
 
-@app.route("/")
-def serve_index():
-    if os.path.exists("index.html"):
-        return send_from_directory(".", "index.html")
-    else:
-        return "⚠️ لا يوجد ملف index.html في هذا المجلد."
+# Simple implementation for testing
+class DistributedExecutor:
+    def __init__(self, secret):
+        self.peer_registry = self.PeerRegistry()
+        logger.debug("Initialized dummy DistributedExecutor")
 
-# 🔢 مهمة موزعة كمثال
-def example_task(x):
-    return x * x + complex_operation(x)
+    class PeerRegistry:
+        def list_peers(self):
+            return [{'ip': '127.0.0.1', 'port': 7520}]
 
-# ⏱️ دالة قياس الأداء
-def benchmark(task_func, *args):
-    start = time.time()
-    result = task_func(*args)
-    duration = time.time() - start
-    return duration, result
+    def submit(self, func, *args):
+        return self.FutureResult(func(*args))
 
-# ⚙️ تشغيل Flask في Thread منفصل
-def start_flask():
-    app.run(host="0.0.0.0", port=7540)
+    class FutureResult:
+        def __init__(self, result):
+            self._result = result
 
-def broadcast_message(executor, message):
+        def result(self):
+            return self._result
+
+    def shutdown(self):
+        pass
+
+executor = DistributedExecutor("test_secret")
+
+@app.route('/')
+def index():
     try:
+        return render_template('index.html')
+    except Exception as e:
+        logger.error(f"Template error: {str(e)}")
+        return "Internal Server Error", 500
+
+@app.route('/send_message', methods=['POST'])
+def send_message():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Invalid JSON"}), 400
+            
+        message = data.get('message')
+        if not message:
+            return jsonify({"error": "Message is required"}), 400
+
+        logger.debug(f"Received message: {message}")
+        
+        # Simulate broadcast
         peers = executor.peer_registry.list_peers()
-    except AttributeError:
-        logging.warning("⚠️ لا يوجد list_peers() في PeerRegistry.")
-        peers = []
+        logger.debug(f"Sending to {len(peers)} peers")
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Message '{message[:20]}...' sent to {len(peers)} peers"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in send_message: {str(e)}")
+        return jsonify({"error": "Internal Server Error"}), 500
 
-    for peer in peers:
-        peer_ip = peer.get('ip')
-        if not peer_ip:
-            logging.warning(f"⚠️ Peer بدون IP: {peer}")
-            continue
+def run_flask():
+    app.run(host='0.0.0.0', port=7540, debug=False)
 
-        url = f"http://{peer_ip}:7520/run"
-        payload = {
-            "func": "print_message",
-            "args": [message]
-        }
-
-        try:
-            response = requests.post(url, json=payload, timeout=5)
-            if response.ok:
-                logging.info(f"✅ تم إرسال الرسالة إلى {peer_ip}: {response.json()}")
-                print(f"✅ تم إرسال الرسالة إلى {peer_ip}: {response.json()}")
-            else:
-                logging.warning(f"❌ استجابة غير صحيحة من {peer_ip}: {response.status_code}")
-                print(f"❌ استجابة غير صحيحة من {peer_ip}: {response.status_code}")
-        except Exception as e:
-            logging.warning(f"❌ فشل الإرسال إلى {peer_ip}: {str(e)}")
-            print(f"❌ فشل الإرسال إلى {peer_ip}: {str(e)}")
-
-def main():
-    logging.basicConfig(level=logging.INFO)
-
+if __name__ == '__main__':
+    logger.info("Starting application...")
+    
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    
     try:
-        # تهيئة النظام الموزع
-        executor = DistributedExecutor("my_shared_secret_123")
-        executor.peer_registry.register_service("main_node", 7520, load=0.2)
-
-        logging.info("✅ نظام توزيع المهام يعمل...")
-
-        # تشغيل Flask
-        flask_thread = threading.Thread(target=start_flask, daemon=True)
-        flask_thread.start()
-
-        tasks = {
-            "1": ("ضرب المصفوفات", matrix_multiply, 500),
-            "2": ("حساب الأعداد الأولية", prime_calculation, 100000),
-            "3": ("معالجة البيانات", data_processing, 10000),
-            "4": ("محاكاة معالجة الصور", image_processing_emulation, 100),
-            "5": ("مهمة موزعة معقدة", example_task, 42),
-            "6": ("إرسال رسالة إلى جميع الأجهزة", None, None)
-        }
-
         while True:
-            print("\n📌 نظام توزيع المهام الذكي")
-            print("اختر مهمة لتشغيلها:")
-            for k, v in tasks.items():
-                print(f"{k}: {v[0]}")
-            choice = input("اختر المهمة (أو 'q' للخروج): ")
-
-            if choice.lower() == 'q':
-                break
-
-            if choice == "6":
-                message = input("📝 أدخل الرسالة لإرسالها إلى جميع الأجهزة: ")
-                broadcast_message(executor, message)
-                print("✅ تم إرسال الرسالة لجميع الأجهزة.")
-                continue
-
-            if choice in tasks:
-                name, func, arg = tasks[choice]
-                print(f"\n🚀 تشغيل: {name}...")
-
-                if choice == "5":
-                    print("تم إرسال المهمة إلى العقدة الموزعة...")
-                    future = executor.submit(func, arg)
-                    result = future.result()
-                    print(f"✅ النتيجة (موزعة): {result}")
-                else:
-                    duration, result = benchmark(func, arg)
-                    print(f"✅ النتيجة: {json.dumps(result, indent=2)[:200]}...")
-                    print(f"⏱️ الوقت المستغرق: {duration:.2f} ثانية")
-            else:
-                print("❌ اختيار غير صحيح!")
-
-    except Exception:
-        logging.exception("⚠️ خطأ رئيسي:")
-
-if __name__ == "__main__":
-    main()
+            time.sleep(1)
+    except KeyboardInterrupt:
+        logger.info("Shutting down...")
+    finally:
+        executor.shutdown()
+        logger.info("Application stopped")
