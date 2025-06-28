@@ -3,6 +3,7 @@ import json
 import logging
 import threading
 import os
+import requests  # ✅ ضروري للإرسال عبر HTTP
 
 from flask import Flask, send_from_directory
 from distributed_executor import DistributedExecutor
@@ -34,10 +35,35 @@ def start_flask():
     app.run(host="0.0.0.0", port=7540)
 
 def broadcast_message(executor, message):
-    peers = executor.peer_registry.list_peers()
+    try:
+        peers = executor.peer_registry.list_peers()
+    except AttributeError:
+        logging.warning("⚠️ لا يوجد list_peers() في PeerRegistry.")
+        peers = []
+
     for peer in peers:
-        logging.info(f"📡 إرسال رسالة إلى: {peer}")
-        executor.submit_remote(peer, "print_message", message)
+        peer_ip = peer.get('ip')
+        if not peer_ip:
+            logging.warning(f"⚠️ Peer بدون IP: {peer}")
+            continue
+
+        url = f"http://{peer_ip}:7520/run"
+        payload = {
+            "func": "print_message",
+            "args": [message]
+        }
+
+        try:
+            response = requests.post(url, json=payload, timeout=5)
+            if response.ok:
+                logging.info(f"✅ تم إرسال الرسالة إلى {peer_ip}: {response.json()}")
+                print(f"✅ تم إرسال الرسالة إلى {peer_ip}: {response.json()}")
+            else:
+                logging.warning(f"❌ استجابة غير صحيحة من {peer_ip}: {response.status_code}")
+                print(f"❌ استجابة غير صحيحة من {peer_ip}: {response.status_code}")
+        except Exception as e:
+            logging.warning(f"❌ فشل الإرسال إلى {peer_ip}: {str(e)}")
+            print(f"❌ فشل الإرسال إلى {peer_ip}: {str(e)}")
 
 def main():
     logging.basicConfig(level=logging.INFO)
