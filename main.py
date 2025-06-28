@@ -1,97 +1,79 @@
+# main.py
 import time
 import json
+from distributed_executor import DistributedExecutor
+from your_tasks import *
+# main.py
+from distributed_executor import DistributedExecutor
 import logging
-import threading
-import os
-import requests
-from flask import Flask, render_template, request, jsonify
 
-# Configure logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('app.log', mode='w'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
-
-app = Flask(__name__)
-
-# Simple implementation for testing
-class DistributedExecutor:
-    def __init__(self, secret):
-        self.peer_registry = self.PeerRegistry()
-        logger.debug("Initialized dummy DistributedExecutor")
-
-    class PeerRegistry:
-        def list_peers(self):
-            return [{'ip': '127.0.0.1', 'port': 7520}]
-
-    def submit(self, func, *args):
-        return self.FutureResult(func(*args))
-
-    class FutureResult:
-        def __init__(self, result):
-            self._result = result
-
-        def result(self):
-            return self._result
-
-    def shutdown(self):
-        pass
-
-executor = DistributedExecutor("test_secret")
-
-@app.route('/')
-def index():
-    try:
-        return render_template('index.html')
-    except Exception as e:
-        logger.error(f"Template error: {str(e)}")
-        return "Internal Server Error", 500
-
-@app.route('/send_message', methods=['POST'])
-def send_message():
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "Invalid JSON"}), 400
-            
-        message = data.get('message')
-        if not message:
-            return jsonify({"error": "Message is required"}), 400
-
-        logger.debug(f"Received message: {message}")
-        
-        # Simulate broadcast
-        peers = executor.peer_registry.list_peers()
-        logger.debug(f"Sending to {len(peers)} peers")
-        
-        return jsonify({
-            "status": "success",
-            "message": f"Message '{message[:20]}...' sent to {len(peers)} peers"
-        })
-        
-    except Exception as e:
-        logger.error(f"Error in send_message: {str(e)}")
-        return jsonify({"error": "Internal Server Error"}), 500
-
-def run_flask():
-    app.run(host='0.0.0.0', port=7540, debug=False)
-
-if __name__ == '__main__':
-    logger.info("Starting application...")
-    
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
-    flask_thread.start()
+def main():
+    logging.basicConfig(level=logging.INFO)
     
     try:
+        # تهيئة النظام
+        executor = DistributedExecutor("my_shared_secret_123")
+        executor.peer_registry.register_service("main_node", 7520)
+        
+        logging.info("نظام توزيع المهام يعمل...")
+        
+        # يمكنك هنا إضافة مهام للتنفيذ
         while True:
             time.sleep(1)
-    except KeyboardInterrupt:
-        logger.info("Shutting down...")
-    finally:
-        executor.shutdown()
-        logger.info("Application stopped")
+            
+    except Exception as e:
+        logging.error(f"خطأ رئيسي: {str(e)}")
+
+if __name__ == "__main__":
+    main()
+def example_task(x):
+    # مهمة معقدة قابلة للتوزيع
+    return x * x + complex_operation(x)
+
+def benchmark(task_func, *args):
+    """قياس أداء المهمة"""
+    start = time.time()
+    result = task_func(*args)
+    duration = time.time() - start
+    return duration, result
+
+def main():
+    executor = DistributedExecutor("my_shared_secret_123")
+    executor.peer_registry.register_service("node1", 7520, load=0.2)
+
+    tasks = {
+        "1": ("ضرب المصفوفات", matrix_multiply, 500),
+        "2": ("حساب الأعداد الأولية", prime_calculation, 100000),
+        "3": ("معالجة البيانات", data_processing, 10000),
+        "4": ("محاكاة معالجة الصور", image_processing_emulation, 100),
+        "5": ("مهمة موزعة معقدة", example_task, 42)
+    }
+
+    while True:
+        print("\nنظام توزيع المهام الذكي")
+        print("اختر مهمة لتشغيلها:")
+        for k, v in tasks.items():
+            print(f"{k}: {v[0]}")
+        choice = input("اختر المهمة (أو 'q' للخروج): ")
+
+        if choice.lower() == 'q':
+            break
+
+        if choice in tasks:
+            name, func, arg = tasks[choice]
+            print(f"\nتشغيل: {name}...")
+
+            if choice == "5":
+                print("تم إرسال المهمة إلى العقدة الموزعة...")
+                future = executor.submit(func, arg)
+                result = future.result()
+                print(f"النتيجة (موزعة): {result}")
+            else:
+                duration, result = benchmark(func, arg)
+                print(f"النتيجة: {json.dumps(result, indent=2)[:200]}...")
+                print(f"الوقت المستغرق: {duration:.2f} ثانية")
+        else:
+            print("اختيار غير صحيح!")
+
+if __name__ == "__main__":
+    main()
